@@ -89,7 +89,7 @@ struct Init: SwiftlyCommand {
             """
         }
 
-        func oldEnvFish2(_: SwiftlyCoreContext) -> String {
+        func oldEnvFish3(_: SwiftlyCoreContext) -> String {
             """
             set -x SWIFTLY_HOME_DIR "\(homeDirRaw)"
             set -x SWIFTLY_BIN_DIR "\(binDirRaw)"
@@ -115,11 +115,26 @@ struct Init: SwiftlyCommand {
             """
         }
 
-        func oldEnvFish(_: SwiftlyCoreContext) -> String {
+        func oldEnvFish2(_: SwiftlyCoreContext) -> String {
             """
             set -x SWIFTLY_HOME_DIR "\(homeDirRaw)"
             set -x SWIFTLY_BIN_DIR "\(binDirRaw)"
             set -x SWIFTLY_TOOLCHAINS_DIR "\(toolchainsDirRaw)"
+
+            # Remove SWIFTLY_BIN_DIR from PATH if present, then prepend it
+            while set -l index (contains -i "$SWIFTLY_BIN_DIR" $PATH)
+                set -e PATH[$index]
+            end
+            set -x PATH "$SWIFTLY_BIN_DIR" $PATH
+
+            """
+        }
+
+        func oldEnvFish(_: SwiftlyCoreContext) -> String {
+            """
+            set -x SWIFTLY_HOME_DIR \(homeDir)
+            set -x SWIFTLY_BIN_DIR \(binDir)
+            set -x SWIFTLY_TOOLCHAINS_DIR \(toolchainsDir)
 
             # Remove SWIFTLY_BIN_DIR from PATH if present, then prepend it
             while set -l index (contains -i "$SWIFTLY_BIN_DIR" $PATH)
@@ -151,10 +166,8 @@ struct Init: SwiftlyCommand {
             set -x SWIFTLY_TOOLCHAINS_DIR \(toolchainsDir)
 
             # Remove SWIFTLY_BIN_DIR from PATH if present, then prepend it
-            while set -l index (contains -i "$SWIFTLY_BIN_DIR" $PATH)
-                set -e PATH[$index]
-            end
-            set -x PATH "$SWIFTLY_BIN_DIR" $PATH
+            set -gx PATH (string match -v -- "$SWIFTLY_BIN_DIR" $PATH)
+            fish_add_path -P "$SWIFTLY_BIN_DIR"
 
             """
         }
@@ -179,7 +192,7 @@ struct Init: SwiftlyCommand {
             if case let envFile = (Swiftly.currentPlatform.swiftlyHomeDir(ctx)) / "env.fish",
                (try? await fs.exists(atPath: envFile)) ?? false,
                let contents = String(data: (try? await fs.cat(atPath: envFile)) ?? Data(), encoding: .utf8),
-               contents == oldEnvFish(ctx) || contents == oldEnvFish2(ctx)
+               contents == oldEnvFish(ctx) || contents == oldEnvFish2(ctx) || contents == oldEnvFish3(ctx)
             {
                 await ctx.print("Updating fish shell environment \(envFile)")
                 try Data(envFish(ctx).utf8).write(to: envFile, options: .atomic)
